@@ -23,7 +23,7 @@ curl -X GET http://localhost:8080 -
 H "API_KEY: TOKEN"
 ```
 
-You can see examples in `/api/requests`.
+You can see examples of use in `/api/requests`.
 
 3) The variables for the rate limiter can be configured in the `.env` file in the root folder. They are:
    - `MAX_REQUESTS_WITHOUT_TOKEN_PER_SECOND`: The maximum number of requests per second without the `API_KEY` header.
