@@ -30,6 +30,9 @@ You can see examples of use in `/api/requests`.
    - `MAX_REQUESTS_WITH_TOKEN_PER_SECOND`: The maximum number of requests per second with the `API_KEY` header.
    - `TIME_BLOCK_IN_SECOND`: The time in seconds when the IP or token will be blocked.
 
+* Obs.: After changing the `.env` file, you need to restart the API container to apply the changes using the command:
+* `docker-compose up -d`
+
 4) The automatized tests can be run using the command:
 
 ```

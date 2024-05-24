@@ -6,13 +6,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - MAX_REQUESTS_WITHOUT_TOKEN_PER_SECOND=10
-      - MAX_REQUESTS_WITH_TOKEN_PER_SECOND=100
-      - TIME_BLOCK_IN_SECOND=5
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
       - redis
+    env_file:
+        - .env
     volumes:
       - ./.env:/.env
 

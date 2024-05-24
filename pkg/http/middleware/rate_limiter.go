@@ -58,60 +58,63 @@ func NewRateLimiter(maxIPRequests, maxTokenRequests, blockDuration int, cache db
 
 func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		clientID, err := extractClientIP(r)
+		id, err := extractClientIP(r)
 		if err != nil {
-			log.Printf("Error extracting client IP: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			log.Println("Failed to get remote address: ", err)
+			http.Error(w, "Internal Server Error", http.StatusBadRequest)
 			return
 		}
-		requestType := "ip"
-		if apiKey := r.Header.Get("API_KEY"); apiKey != "" {
-			clientID = apiKey
-			requestType = "api_key"
+		kind := "addr"
+		if r.Header.Get("API_KEY") != "" {
+			id = r.Header.Get("API_KEY")
+			kind = "token"
 		}
 
-		cacheKey := fmt.Sprintf("%s:%s", requestType, clientID)
-		log.Printf("Cache key: %s", cacheKey)
+		key := fmt.Sprintf("%s:%s", kind, id)
+		log.Println("Key: ", key)
 
-		cacheValue, err := rl.cache.Get(cacheKey)
+		val, err := rl.cache.Get(key)
 		if err != nil {
-			log.Printf("Error fetching from cache: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			log.Println("Failed to get value from cache: ", err)
+			http.Error(w, "Internal Server Error", http.StatusBadGateway)
 			return
 		}
 
-		if cacheValue == "" {
-			if err := rl.cache.Set(cacheKey, "1", time.Duration(rl.blockDuration)*time.Second); err != nil {
-				log.Printf("Error setting cache: %v", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		if val == "" {
+			val = "1"
+			err := rl.cache.Set(key, val, time.Duration(rl.blockDuration)*time.Second)
+			if err != nil {
+				log.Println("Failed to set value in cache: ", err)
+				http.Error(w, "Internal Server Error", http.StatusBadGateway)
 				return
 			}
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		requestCount, err := strconv.Atoi(cacheValue)
+		count, err := strconv.Atoi(val)
 		if err != nil {
-			log.Printf("Error converting cache value: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			log.Println("Failed to convert value to int: ", err)
+			http.Error(w, "Internal Server Error", http.StatusBadGateway)
 			return
 		}
 
-		maxRequests := rl.maxIPRequests
-		if requestType == "api_key" {
-			maxRequests = rl.maxTokenRequests
+		maxRequest := rl.maxIPRequests
+		if kind == "token" {
+			maxRequest = rl.maxTokenRequests
 		}
 
-		if requestCount+1 > maxRequests {
-			log.Println("Rate limit exceeded")
+		if count+1 > maxRequest {
+			log.Println("Too many requests")
 			w.WriteHeader(http.StatusTooManyRequests)
 			w.Write([]byte("you have reached the maximum number of requests or actions allowed within a certain time frame"))
 			return
 		}
 
-		if err := rl.cache.Set(cacheKey, strconv.Itoa(requestCount+1), time.Duration(rl.blockDuration)*time.Second); err != nil {
-			log.Printf("Error updating cache: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		err = rl.cache.Set(key, strconv.Itoa(count+1), time.Duration(rl.blockDuration)*time.Second)
+		if err != nil {
+			log.Println("Filed to set value in cache: ", err)
+			http.Error(w, "Internal Server Error", http.StatusBadGateway)
 			return
 		}
 
